@@ -41,8 +41,8 @@ def build(docker_repo, tag, from_docker=None):
     if from_docker is not None:
         docker_build_arg += f" --build-arg DOCKER_FROM={from_docker}"
 
-    build_command = f"docker build {docker_build_arg} {dockerLLM_dir}/{docker_repo}"
-    push_command = f"docker push {docker_container}"
+    build_command = f"sudo docker build {docker_build_arg} {dockerLLM_dir}/{docker_repo}"
+    push_command = f"sudo docker push {docker_container}"
 
     docker_command(build_command)
     docker_command(push_command)
@@ -50,9 +50,9 @@ def build(docker_repo, tag, from_docker=None):
     return docker_container
 
 def tag(source_container, target_container):
-    tag_command = f"docker tag {source_container} {target_container}"
+    tag_command = f"sudo docker tag {source_container} {target_container}"
     docker_command(tag_command)
-    docker_command(f"docker push {target_container}")
+    docker_command(f"sudo docker push {target_container}")
 
 
 try:
