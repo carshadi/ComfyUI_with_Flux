@@ -33,7 +33,7 @@ def docker_command(command):
     except Exception as e:
         raise e
 
-def build(docker_repo, tag, from_docker=None):
+def build(docker_repo, tag, from_docker=None, push=False):
     docker_container = f"{username}/{docker_repo}:{tag}"
     logger.info(f"Building and pushing {docker_container}")
 
@@ -42,10 +42,11 @@ def build(docker_repo, tag, from_docker=None):
         docker_build_arg += f" --build-arg DOCKER_FROM={from_docker}"
 
     build_command = f"sudo docker build {docker_build_arg} {dockerLLM_dir}/{docker_repo}"
-    push_command = f"sudo docker push {docker_container}"
-
     docker_command(build_command)
-    docker_command(push_command)
+
+    if push:
+        push_command = f"sudo docker push {docker_container}"
+        docker_command(push_command)
 
     return docker_container
 
