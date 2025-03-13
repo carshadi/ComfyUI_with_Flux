@@ -7,9 +7,11 @@ FROM $DOCKER_FROM AS base
 
 # Install Python and required packages
 RUN apt-get update -y && \
-    apt-get install -y python3-full python3-pip python3-venv && \
-    apt-get install -y --no-install-recommends openssh-server openssh-client git git-lfs wget vim zip unzip curl && \
-    apt-get install -y nginx && \
+    apt-get install -y python3-full python3-pip python3-venv software-properties-common && \
+    add-apt-repository universe && \
+    add-apt-repository multiverse && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends openssh-server openssh-client git git-lfs wget vim zip unzip curl nginx && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +32,10 @@ COPY default /etc/nginx/sites-available/default
 
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 
-# Clone the ComfyUI repository and install dependencies inside the virtual environment
+# Install missing dependencies
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-bin
+
+# Clone ComfyUI and install dependencies
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
     /opt/venv/bin/pip install -r requirements.txt && \
@@ -40,7 +45,7 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
     cd /ComfyUI && \
     mkdir pysssss-workflows
 
-# Copy necessary files
+# Copy required files
 COPY --chmod=644 workflows/ /ComfyUI/user/default/workflows/
 COPY --chmod=644 comfy.settings.json /ComfyUI/user/default/comfy.settings.json
 COPY --chmod=644 character_sheet_example.png /ComfyUI/input/character_sheet_example.png
@@ -51,55 +56,34 @@ COPY --chmod=644 example2.png /ComfyUI/input/example2.png
 COPY --chmod=644 driving_video.mp4 /ComfyUI/input/driving_video.mp4
 
 WORKDIR /workspace
-
 EXPOSE 8188
 
-# Download flux_dev_example.png
-RUN wget "https://github.com/comfyanonymous/ComfyUI_examples/blob/master/flux/flux_dev_example.png" -P /ComfyUI
+# Fix incorrect file download
+RUN wget -O /ComfyUI/flux_dev_example.png "https://raw.githubusercontent.com/comfyanonymous/ComfyUI_examples/master/flux/flux_dev_example.png"
 
-# Install additional dependencies for Xlabs-AI/flux-RealismLora
-RUN apt-get update && \
-    apt-get install -y libgl1 libglib2.0-bin
+# Install Xlabs-AI/flux-RealismLora
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/XLabs-AI/x-flux-comfyui.git && \
     cd x-flux-comfyui && \
     /opt/venv/bin/python setup.py
 
-# Set up the virtual environment and install additional Python packages
+# Install Jupyter Notebook
 RUN /opt/venv/bin/pip install jupyterlab
 EXPOSE 8888
 
-# Additional custom nodes
+# Install additional custom nodes
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/flowtyone/ComfyUI-Flowty-LDSR.git && \
     cd ComfyUI-Flowty-LDSR && \
     /opt/venv/bin/pip install -r requirements.txt
 
+# Additional models and custom nodes
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/kijai/ComfyUI-SUPIR.git && \
     cd ComfyUI-SUPIR && \
     /opt/venv/bin/pip install -r requirements.txt
 
-RUN cd /ComfyUI/custom_nodes && \
-    git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
-    cd ComfyUI-KJNodes && \
-    /opt/venv/bin/pip install -r requirements.txt
-
-RUN cd /ComfyUI/custom_nodes && \
-    git clone https://github.com/rgthree/rgthree-comfy.git && \
-    cd rgthree-comfy && \
-    /opt/venv/bin/pip install -r requirements.txt
-
-# More additional nodes
-RUN cd /ComfyUI/custom_nodes && \
-    git clone https://github.com/JPS-GER/ComfyUI_JPS-Nodes.git && \
-    git clone https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git && \
-    git clone https://github.com/Jordach/comfy-plasma.git && \
-    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
-    cd ComfyUI-VideoHelperSuite && \
-    /opt/venv/bin/pip install -r requirements.txt
-
-# Install AI-Toolkit
+# AI-Toolkit installation
 RUN cd / && \
     git clone https://github.com/ostris/ai-toolkit.git && \
     cd ai-toolkit && \
@@ -111,9 +95,38 @@ COPY --chmod=644 ai-toolkit/train_lora.yaml /ai-toolkit/config/train_lora.yaml
 COPY --chmod=755 ai-toolkit/caption_images.py /caption_images.py
 EXPOSE 7860
 
-# Download the model needed for the tutorial workflow on first launch
+# Download model for tutorial workflow
 RUN mkdir -p /ComfyUI/models/checkpoints && \
-    wget "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors?download=true" -O /ComfyUI/models/checkpoints/v1-5-pruned-emaonly-fp16.safetensors
+    wget -O /ComfyUI/models/checkpoints/v1-5-pruned-emaonly-fp16.safetensors "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors"
 
-# Set the default command
+# Install shell scripts
+COPY --chmod=755 start-ssh-only.sh /start.sh
+COPY --chmod=755 start-original.sh /start-original.sh
+COPY --chmod=755 comfyui-on-workspace.sh /comfyui-on-workspace.sh
+COPY --chmod=755 ai-toolkit-on-workspace.sh /ai-toolkit-on-workspace.sh
+COPY --chmod=755 check_files.sh /check_files.sh
+COPY --chmod=755 download_Controlnet.sh /download_Controlnet.sh
+COPY --chmod=755 download_fp16.sh /download_fp16.sh
+COPY --chmod=755 download_LDSR.sh /download_LDSR.sh
+COPY --chmod=755 download_SUPIR.sh /download_SUPIR.sh
+COPY --chmod=755 download_Florence-2.sh /download_Florence-2.sh
+COPY --chmod=755 download_Upscalers.sh /download_Upscalers.sh
+COPY --chmod=755 download_Outpainting.sh /download_Outpainting.sh
+COPY --chmod=755 download_Workflows.sh /download_Workflows.sh
+COPY --chmod=755 update_Workflows.sh /update_Workflows.sh
+COPY --chmod=755 download_ALL.sh /download_ALL.sh
+COPY --chmod=755 make_venv.sh /make_venv.sh
+COPY --chmod=755 download_Files.sh /download_Files.sh
+COPY --chmod=755 download_wan2.1.sh /download_wan2.1.sh
+COPY --chmod=755 disable_mixlab.sh /disable_mixlab.sh
+
+# Make directory and download face detection model
+RUN mkdir -p /ComfyUI/models/ultralytics/bbox && \
+    wget -O /ComfyUI/models/ultralytics/bbox/face_yolov8m.pt "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
+
+# Make directory and download swap model file
+RUN mkdir -p /ComfyUI/models/insightface && \
+    wget -O /ComfyUI/models/insightface/inswapper_128.onnx "https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx"
+
+# Default startup command
 CMD [ "/start.sh" ]
