@@ -58,7 +58,8 @@ EXPOSE 8188
 RUN wget "https://github.com/comfyanonymous/ComfyUI_examples/blob/master/flux/flux_dev_example.png" -P /ComfyUI
 
 # Install additional dependencies for Xlabs-AI/flux-RealismLora
-RUN apt-get install -y libgl1-mesa-glx libglib2.0-0
+RUN apt-get update && \
+    apt-get install -y libgl1 libglib2.0-bin
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/XLabs-AI/x-flux-comfyui.git && \
     cd x-flux-comfyui && \
